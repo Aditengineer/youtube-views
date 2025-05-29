@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://aditengineer.github.io/youtube-views/sitemap.xml
