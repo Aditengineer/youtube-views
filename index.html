@@ -11,10 +11,7 @@
   <button style="padding: 10px 20px; background-color: red; color: white; border: none; border-radius: 5px;">
     Get Free Views
 </button>
-
-
 </a>
-
 
     <link
       rel="stylesheet"
@@ -392,6 +389,11 @@
         width: 100%;
         height: 100%;
         border: none;
+      }
+
+      /* Special styles for Shorts/Instagram */
+      .screen-item.shorts {
+        aspect-ratio: 9/16;
       }
 
       .grid-1 {
@@ -880,7 +882,7 @@
             <input
               type="text"
               id="videoUrl"
-              placeholder="Paste YouTube video URL..."
+              placeholder="Paste YouTube/Shorts or Instagram video URL..."
               value="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
             />
             <button id="playBtn"><i class="fas fa-play"></i> Play Video</button>
@@ -924,7 +926,7 @@
         <div class="preview-window">
           <div class="video-placeholder">
             <i class="fas fa-play-circle"></i>
-            <p>Enter a YouTube URL and click Play to start streaming</p>
+            <p>Enter a YouTube/Shorts or Instagram URL and click Play to start streaming</p>
           </div>
         </div>
       </div>
@@ -1239,18 +1241,54 @@
         // Current video settings
         let currentVideoId = "";
         let currentScreenCount = 1;
+        let isShorts = false;
+        let isInstagram = false;
 
-        // Generate YouTube embed URL with bypass parameters
-        function generateEmbedUrl(videoId) {
-          return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=0&modestbranding=1&rel=0&iv_load_policy=3&enablejsapi=1&origin=${window.location.origin}&widgetid=1`;
+        // Generate embed URL based on platform
+        function generateEmbedUrl(videoId, platform) {
+          if (platform === 'instagram') {
+            return `https://www.instagram.com/p/${videoId}/embed`;
+          } else if (platform === 'youtube-shorts') {
+            return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=0&modestbranding=1&rel=0&iv_load_policy=3&enablejsapi=1&origin=${window.location.origin}&widgetid=1`;
+          } else {
+            return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=0&modestbranding=1&rel=0&iv_load_policy=3&enablejsapi=1&origin=${window.location.origin}&widgetid=1`;
+          }
         }
 
-        // Extract YouTube video ID from URL
-        function getYouTubeId(url) {
-          const regExp =
-            /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+        // Extract video ID from URL
+        function getVideoId(url) {
+          // Check for Instagram URL
+          if (url.includes('instagram.com')) {
+            const instaRegex = /instagram\.com\/(?:p|reel)\/([^\/\?]+)/;
+            const match = url.match(instaRegex);
+            if (match && match[1]) {
+              isInstagram = true;
+              isShorts = false;
+              return { id: match[1], platform: 'instagram' };
+            }
+          }
+          
+          // Check for YouTube Shorts URL
+          if (url.includes('youtube.com/shorts/') || url.includes('youtu.be/')) {
+            const shortsRegex = /(?:youtube\.com\/shorts\/|youtu\.be\/)([^\/\?]+)/;
+            const match = url.match(shortsRegex);
+            if (match && match[1]) {
+              isShorts = true;
+              isInstagram = false;
+              return { id: match[1], platform: 'youtube-shorts' };
+            }
+          }
+          
+          // Regular YouTube video
+          const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
           const match = url.match(regExp);
-          return match && match[2].length === 11 ? match[2] : null;
+          if (match && match[2].length === 11) {
+            isShorts = false;
+            isInstagram = false;
+            return { id: match[2], platform: 'youtube' };
+          }
+          
+          return null;
         }
 
         // Create screen grid with iframes
@@ -1261,9 +1299,12 @@
           for (let i = 0; i < count; i++) {
             const screenItem = document.createElement("div");
             screenItem.className = "screen-item";
+            if (isShorts || isInstagram) {
+              screenItem.classList.add("shorts");
+            }
 
             const iframe = document.createElement("iframe");
-            iframe.src = generateEmbedUrl(currentVideoId);
+            iframe.src = generateEmbedUrl(currentVideoId, isInstagram ? 'instagram' : (isShorts ? 'youtube-shorts' : 'youtube'));
             iframe.allow =
               "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
             iframe.allowFullscreen = true;
@@ -1351,77 +1392,78 @@
         }
 
         // Play video handler
-        
-// Ad on Play button after 3 seconds
-playBtn.addEventListener("click", function () {
-  const url = videoUrl.value.trim();
-  if (!url) {
-    alert("Please enter a YouTube video URL");
-    return;
-  }
+        playBtn.addEventListener("click", function () {
+          const url = videoUrl.value.trim();
+          if (!url) {
+            alert("Please enter a YouTube/Shorts or Instagram video URL");
+            return;
+          }
 
-  const videoId = getYouTubeId(url);
-  if (!videoId) {
-    alert("Invalid YouTube URL. Please enter a valid YouTube video link.");
-    return;
-  }
+          const videoInfo = getVideoId(url);
+          if (!videoInfo || !videoInfo.id) {
+            alert("Invalid URL. Please enter a valid YouTube/Shorts or Instagram video link.");
+            return;
+          }
 
-  currentVideoId = videoId;
-  const screenCount = parseInt(
-    document.querySelector('input[name="screenOption"]:checked').value
-  );
-  currentScreenCount = screenCount;
+          currentVideoId = videoInfo.id;
+          isShorts = videoInfo.platform === 'youtube-shorts';
+          isInstagram = videoInfo.platform === 'instagram';
+          
+          const screenCount = parseInt(
+            document.querySelector('input[name="screenOption"]:checked').value
+          );
+          currentScreenCount = screenCount;
 
-  // Remove placeholder
-  if (videoPlaceholder) {
-    videoPlaceholder.style.display = "none";
-  }
+          // Remove placeholder
+          if (videoPlaceholder) {
+            videoPlaceholder.style.display = "none";
+          }
 
-  // Clear previous content
-  previewWindow.innerHTML = "";
+          // Clear previous content
+          previewWindow.innerHTML = "";
 
-  // Create new grid
-  const screenGrid = createScreenGrid(screenCount);
-  previewWindow.appendChild(screenGrid);
+          // Create new grid
+          const screenGrid = createScreenGrid(screenCount);
+          previewWindow.appendChild(screenGrid);
 
-  // Scroll to preview section
-  document.querySelector("#preview").scrollIntoView({ behavior: "smooth" });
+          // Scroll to preview section
+          document.querySelector("#preview").scrollIntoView({ behavior: "smooth" });
 
-  // Delay ad after 3 seconds
-  setTimeout(() => {
-    window.open("https://www.profitableratecpm.com/scp94ja9ix?key=15c0ce047a5e183ef5d86a8a0c4fd719", "_blank");
-  }, 3000);
-});
+          // Delay ad after 3 seconds
+          setTimeout(() => {
+            window.open("https://www.profitableratecpm.com/scp94ja9ix?key=15c0ce047a5e183ef5d86a8a0c4fd719", "_blank");
+          }, 3000);
+        });
 
-// Ad on Generate Email button
-generateEmailBtn.addEventListener("click", function () {
-  // Open ad immediately on click
-  window.open("https://www.profitableratecpm.com/cbedbnvij?key=a2439fa26844e12e028f3932600fb658", "_blank");
+        // Ad on Generate Email button
+        generateEmailBtn.addEventListener("click", function () {
+          // Open ad immediately on click
+          window.open("https://www.profitableratecpm.com/wpube0zc?key=07148d15f4cf1af04ef87209b4f90cb0", "_blank");
 
-  const email = generateTempEmail();
-  tempEmailDisplay.textContent = email;
+          const email = generateTempEmail();
+          tempEmailDisplay.textContent = email;
 
-  // Generate demo messages
-  const messages = generateDemoMessages(email);
-  inbox.innerHTML = "";
+          // Generate demo messages
+          const messages = generateDemoMessages(email);
+          inbox.innerHTML = "";
 
-  messages.forEach((msg) => {
-    const messageElement = document.createElement("div");
-    messageElement.className = "message";
-    messageElement.innerHTML = `
-      <div class="message-header">
-        <span class="message-sender">${msg.sender}</span>
-        <span>${msg.time}</span>
-      </div>
-      <div class="message-content">${msg.content}</div>
-    `;
-    inbox.appendChild(messageElement);
-  });
+          messages.forEach((msg) => {
+            const messageElement = document.createElement("div");
+            messageElement.className = "message";
+            messageElement.innerHTML = `
+              <div class="message-header">
+                <span class="message-sender">${msg.sender}</span>
+                <span>${msg.time}</span>
+              </div>
+              <div class="message-content">${msg.content}</div>
+            `;
+            inbox.appendChild(messageElement);
+          });
 
-  document.querySelector("#temp-email").scrollIntoView({ behavior: "smooth" });
-});
+          document.querySelector("#temp-email").scrollIntoView({ behavior: "smooth" });
+        });
 
-generateUrlBtn.addEventListener("click", function () {
+        generateUrlBtn.addEventListener("click", function () {
           const url = urlInput.value.trim();
           if (!url) {
             alert("Please enter a URL");
